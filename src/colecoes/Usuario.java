@@ -2,9 +2,9 @@ package colecoes;
 
 public class Usuario {
 
-	String nome;
+	public String nome;
 	
-	Usuario(String nome) {
+	public Usuario(String nome) {
 		this.nome = nome;
 	}
 	

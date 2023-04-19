@@ -21,8 +21,8 @@ public class Map {
 		System.out.println("\n\nUsando composição...");
 		marcas.stream()
 			.map(Utilitarios.maiuscula)
-			.map(primeiraLetra)
-			.map(Utilitarios::grito)
+			//.map(primeiraLetra)
+			//.map(Utilitarios::grito)
 			.forEach(print);
 	}
 }

@@ -7,6 +7,8 @@ public class Lista {
 
 	public static void main(String[] args) {
 		List<Usuario> lista = new ArrayList<>();
+
+		lista.add(new Usuario("Antonio"));
 		
 		Usuario u1 = new Usuario("Ana");
 		lista.add(u1);
