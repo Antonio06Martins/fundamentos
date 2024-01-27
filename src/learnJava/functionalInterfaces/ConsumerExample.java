@@ -8,7 +8,8 @@ import java.util.function.Consumer;
 
 public class ConsumerExample {
 
-    static Consumer<Student>  c1= p -> System.out.println(p);
+    //static Consumer<Student>  c1= p -> System.out.println(p);
+    static Consumer<Student>  c1= System.out::println;
 
     static Consumer<Student>  c2= p -> System.out.print(p.getName().toUpperCase());
 

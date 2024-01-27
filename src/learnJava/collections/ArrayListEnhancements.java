@@ -15,10 +15,17 @@ public class ArrayListEnhancements {
            System.out.println(s);
        }
        names.forEach((s) -> System.out.println(s));
+       names.forEach(System.out::println);
 
        names.forEach(s -> System.out.println(s));
+       names.forEach(System.out::println);
 
        List<String> strings = Arrays.asList("one", "two","three","four");
+       strings.forEach(System.out::println);
+       strings.stream().filter(s -> s.startsWith("t")).forEach(System.out::println);
+       System.out.println("AQUIIIIIIIIII");
+       strings.stream().filter(s -> s.startsWith("t")).forEach(System.out::println);
+       System.out.println("AQUIIIIIIIIII");
        AtomicInteger count= new AtomicInteger();
        strings.forEach((name) -> {
            System.out.println("name : " + name);

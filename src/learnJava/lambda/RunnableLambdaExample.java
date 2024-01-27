@@ -21,6 +21,7 @@ public class RunnableLambdaExample {
 
         // ()->{}
         //assigning a lambda to a variable.
+        //atribuindo um lambda a uma variável
 
         Runnable runnableLambda = () -> {System.out.println("Inside Runnable 2");};
 

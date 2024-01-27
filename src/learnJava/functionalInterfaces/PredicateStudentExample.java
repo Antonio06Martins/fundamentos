@@ -35,5 +35,6 @@ public class PredicateStudentExample {
         boolean result = gradePredicate.apply(2).test(5) && gpaPredicate.apply(3.6).test(3.9);
         System.out.println("Result from Predicate : " + result);
 
+
     }
 }

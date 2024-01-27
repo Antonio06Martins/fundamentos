@@ -47,5 +47,12 @@ public class BiConsumerExample {
 
         nameAndActivities();
 
+
+        BiConsumer<Integer, List<String>> players = (number, list) -> {
+            System.out.println(number + " players");
+            System.out.println(list + " players");
+        };
+        players.accept(10, List.of("Player"));
+
     }
 }

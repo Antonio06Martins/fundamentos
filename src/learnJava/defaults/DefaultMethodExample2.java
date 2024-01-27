@@ -1,7 +1,7 @@
 package learnJava.defaults;
 
-import com.learnJava.data.Student;
-import com.learnJava.data.StudentDataBase;
+import learnJava.data.Student;
+import learnJava.data.StudentDataBase;
 
 import java.util.Comparator;
 import java.util.List;
