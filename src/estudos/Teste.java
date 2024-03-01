@@ -13,6 +13,308 @@ public class Teste {
     }
 }
 
+//conversão 
+
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+@RestController
+public class WebhookController {
+
+    @PostMapping("/webhook")
+    public String handleWebhook(@RequestBody String body, @RequestHeader("Digest") String digestHeader,
+                                @RequestHeader("Host") String hostHeader, @RequestHeader("Signature") String signatureHeader,
+                                @RequestHeader("Signature-Input") String signatureInputHeader) {
+        try {
+            // Parse dos valores do header Signature-Input
+            String[] signatureInputParts = signatureInputHeader.split(";");
+            String created = null;
+            String nonce = null;
+            for (String part : signatureInputParts) {
+                String[] keyValue = part.split("=");
+                if (keyValue.length == 2) {
+                    String key = keyValue[0].trim();
+                    String value = keyValue[1].replaceAll("\"", "").trim();
+                    if (key.equals("created")) {
+                        created = value;
+                    } else if (key.equals("nonce")) {
+                        nonce = value;
+                    }
+                }
+            }
+
+            // Verificar se a assinatura usa o algoritmo esperado
+            if (!signatureInputHeader.contains("alg=\"hmac-sha256\"")) {
+                throw new IllegalArgumentException("Algoritmo de assinatura inválido");
+            }
+
+            // Obter o secret para verificar a assinatura
+            String secret = "your-secret-key";
+
+            // Obter o valor da mensagem
+            String message = "digest: " + digestHeader + "\nhost: " + hostHeader + "\n";
+
+            // Gerar a signature esperada usando HMAC-SHA256
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKeySpec);
+            String dataToSign = message + created + nonce + ":"; // adicione os parâmetros extras, se necessário
+            byte[] signatureBytes = hmacSha256.doFinal(dataToSign.getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signatureHeader)) {
+                throw new IllegalArgumentException("Assinatura inválida");
+            }
+
+            // Se a assinatura for válida, processar a mensagem
+            return "Mensagem autenticada com sucesso!";
+        } catch (NoSuchAlgorithmException | IllegalArgumentException | IllegalStateException | java.security.InvalidKeyException e) {
+            e.printStackTrace(); // Trate as exceções de acordo com a sua lógica de negócio
+            return "Erro ao processar a mensagem";
+        }
+    }
+}
+
+//com o objeto
+
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Map;
+
+@RestController
+public class WebhookController {
+
+    @PostMapping("/webhook")
+    public String handleWebhook(@RequestBody WebhookRequest webhookRequest, @RequestHeader("Digest") String digestHeader,
+                                @RequestHeader("Host") String hostHeader, @RequestHeader("Signature") String signatureHeader,
+                                @RequestHeader("Signature-Input") String signatureInputHeader) {
+        try {
+            // Parse dos valores do header Signature-Input
+            String[] signatureInputParts = signatureInputHeader.split(";");
+            String created = null;
+            String nonce = null;
+            for (String part : signatureInputParts) {
+                String[] keyValue = part.split("=");
+                if (keyValue.length == 2) {
+                    String key = keyValue[0].trim();
+                    String value = keyValue[1].replaceAll("\"", "").trim();
+                    if (key.equals("created")) {
+                        created = value;
+                    } else if (key.equals("nonce")) {
+                        nonce = value;
+                    }
+                }
+            }
+
+            // Verificar se a assinatura usa o algoritmo esperado
+            if (!signatureInputHeader.contains("alg=\"hmac-sha256\"")) {
+                throw new IllegalArgumentException("Algoritmo de assinatura inválido");
+            }
+
+            // Obter o secret para verificar a assinatura
+            String secret = "your-secret-key";
+
+            // Obter o valor da mensagem
+            String message = "digest: " + digestHeader + "\nhost: " + hostHeader + "\n";
+
+            // Gerar a signature esperada usando HMAC-SHA256
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKeySpec);
+            String dataToSign = message + created + nonce + ":"; // adicione os parâmetros extras, se necessário
+            byte[] signatureBytes = hmacSha256.doFinal(dataToSign.getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signatureHeader)) {
+                throw new IllegalArgumentException("Assinatura inválida");
+            }
+
+            // Se a assinatura for válida, processar a mensagem
+            // Faça o processamento da mensagem aqui
+            return "Mensagem autenticada com sucesso!";
+        } catch (NoSuchAlgorithmException | IllegalArgumentException | IllegalStateException | java.security.InvalidKeyException e) {
+            e.printStackTrace(); // Trate as exceções de acordo com a sua lógica de negócio
+            return "Erro ao processar a mensagem";
+        }
+    }
+}
+
+class WebhookRequest {
+    private String id;
+    private String nome;
+    private Map<String, Object> outrosDados;
+
+    // Getters e setters
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getNome() {
+        return nome;
+    }
+
+    public void setNome(String nome) {
+        this.nome = nome;
+    }
+
+    public Map<String, Object> getOutrosDados() {
+        return outrosDados;
+    }
+
+    public void setOutrosDados(Map<String, Object> outrosDados) {
+        this.outrosDados = outrosDados;
+    }
+}
+
+//retornando status 
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.util.Map;
+
+@RestController
+public class WebhookController {
+
+    @PostMapping("/webhook")
+    public ResponseEntity<String> handleWebhook(@RequestBody WebhookRequest webhookRequest, @RequestHeader("Digest") String digestHeader,
+                                @RequestHeader("Host") String hostHeader, @RequestHeader("Signature") String signatureHeader,
+                                @RequestHeader("Signature-Input") String signatureInputHeader) {
+        try {
+            // Parse dos valores do header Signature-Input
+            String[] signatureInputParts = signatureInputHeader.split(";");
+            String created = null;
+            String nonce = null;
+            for (String part : signatureInputParts) {
+                String[] keyValue = part.split("=");
+                if (keyValue.length == 2) {
+                    String key = keyValue[0].trim();
+                    String value = keyValue[1].replaceAll("\"", "").trim();
+                    if (key.equals("created")) {
+                        created = value;
+                    } else if (key.equals("nonce")) {
+                        nonce = value;
+                    }
+                }
+            }
+
+            // Verificar se a assinatura usa o algoritmo esperado
+            if (!signatureInputHeader.contains("alg=\"hmac-sha256\"")) {
+                throw new IllegalArgumentException("Algoritmo de assinatura inválido");
+            }
+
+            // Obter o secret para verificar a assinatura
+            String secret = "your-secret-key";
+
+            // Obter o valor da mensagem
+            String message = "digest: " + digestHeader + "\nhost: " + hostHeader + "\n";
+
+            // Gerar a signature esperada usando HMAC-SHA256
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKeySpec = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKeySpec);
+            String dataToSign = message + created + nonce + ":"; // adicione os parâmetros extras, se necessário
+            byte[] signatureBytes = hmacSha256.doFinal(dataToSign.getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signatureHeader)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Assinatura inválida");
+            }
+
+            // Se a assinatura for válida, processar a mensagem
+            // Faça o processamento da mensagem aqui
+            return ResponseEntity.ok("Mensagem autenticada com sucesso!");
+        } catch (NoSuchAlgorithmException | IllegalArgumentException | IllegalStateException | java.security.InvalidKeyException e) {
+            e.printStackTrace(); // Trate as exceções de acordo com a sua lógica de negócio
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro ao processar a mensagem");
+        }
+    }
+}
+
+
+//somente verificação do hash
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+@RestController
+public class WebhookController {
+
+    @PostMapping("/webhook")
+    public ResponseEntity<String> handleWebhook(@RequestBody WebhookRequest webhookRequest, @RequestHeader("Digest") String digestHeader) {
+        try {
+            // Calcula o digest do corpo da mensagem
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hashBytes = digest.digest(webhookRequest.toString().getBytes(StandardCharsets.UTF_8));
+            String hashedBody = "SHA-256=" + Base64.getEncoder().encodeToString(hashBytes);
+
+            // Comparar os digests para verificar a autenticidade da mensagem
+            if (!hashedBody.equals(digestHeader)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Digest inválido");
+            }
+
+            // Se o digest for válido, processar a mensagem
+            // Faça o processamento da mensagem aqui
+            return ResponseEntity.ok("Mensagem autenticada com sucesso!");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace(); // Trate as exceções de acordo com a sua lógica de negócio
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro ao processar a mensagem");
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
