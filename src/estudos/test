@@ -1,0 +1,717 @@
+Aqui está uma tradução da verificação HMAC para Java 17:
+
+java
+Copy code
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+public class VerifySignature {
+
+    public static void main(String[] args) {
+        // Headers recebidos
+        String digest = "SHA-256=8df2bffaf24313e75ace59688f2592993d2f990e5f5c9caea851c656492f9c83";
+        String host = "3a2924a6a9dfb9aa173f5512cf2d54aa.m.pipedream.net";
+        String signature = "webhook-param=:6974557af18a1925179c17c30e4239e8b9d68e883b2d3e13fb5498f85df3d858:";
+        String signatureInput = "webhook-param=(\"digest\" \"@target-uri\");created=1677784215510;nonce=\"a8ca9147-f71d-4b02-b229-5f1a5dbb753b\";alg=\"hmac-sha256\"";
+
+        // Parse dos valores do header signature-input
+        String[] sigInputParts = signatureInput.split(";");
+        String created = "";
+        String nonce = "";
+        for (String part : sigInputParts) {
+            String[] keyValue = part.split("=");
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String value = keyValue[1].replace("\"", "").trim();
+                if (key.equals("created")) {
+                    created = value;
+                } else if (key.equals("nonce")) {
+                    nonce = value;
+                }
+            }
+        }
+
+        // Verificar se a Signature usa o algoritmo esperado
+        String alg = "";
+        String[] algParts = signatureInput.split(";");
+        for (String part : algParts) {
+            if (part.startsWith("alg=")) {
+                alg = part.substring(4).replace("\"", "").trim();
+                break;
+            }
+        }
+        if (!alg.equals("hmac-sha256")) {
+            throw new IllegalArgumentException("Algoritmo de assinatura inválido");
+        }
+
+        // Obter o secret para verificar a assinatura
+        String secret = "your-secret-key";
+
+        // Obter o valor da mensagem
+        String message = String.format("digest: %s\nhost: %s\n", digest, host);
+
+        // Gerar a signature esperada usando HMAC-SHA256
+        try {
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKey);
+            byte[] signatureBytes = hmacSha256.doFinal((message + created + nonce + signatureInput).getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signature)) {
+                throw new IllegalArgumentException("Assinatura inválida");
+            }
+
+            System.out.println("Mensagem autenticada com sucesso!");
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+        }
+    }
+}
+Certifique-se de substituir "your-secret-key" pela chave secreta real.
+
+
+
+User
+essa verificação será feita e um controller com o metodo post 
+ChatGPT
+Se você estiver implementando esta verificação em um método POST em um controller Java, você pode usar a estrutura de um framework como Spring Boot para lidar com as requisições HTTP. Aqui está um exemplo de como você pode integrar a verificação HMAC em um controller Spring Boot:
+
+java
+Copy code
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+@RestController
+public class WebhookController {
+
+    private static final String SECRET = "your-secret-key";
+
+    @PostMapping("/webhook")
+    public ResponseEntity<String> handleWebhook(@RequestHeader("digest") String digest,
+                                                @RequestHeader("signature") String signature,
+                                                @RequestHeader("signature-input") String signatureInput,
+                                                @RequestBody String requestBody) {
+        // Parse dos valores do header signature-input
+        String[] sigInputParts = signatureInput.split(";");
+        String created = "";
+        String nonce = "";
+        for (String part : sigInputParts) {
+            String[] keyValue = part.split("=");
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String value = keyValue[1].replace("\"", "").trim();
+                if (key.equals("created")) {
+                    created = value;
+                } else if (key.equals("nonce")) {
+                    nonce = value;
+                }
+            }
+        }
+
+        // Verificar se a Signature usa o algoritmo esperado
+        String alg = "";
+        String[] algParts = signatureInput.split(";");
+        for (String part : algParts) {
+            if (part.startsWith("alg=")) {
+                alg = part.substring(4).replace("\"", "").trim();
+                break;
+            }
+        }
+        if (!alg.equals("hmac-sha256")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Algoritmo de assinatura inválido");
+        }
+
+        // Gerar a signature esperada usando HMAC-SHA256
+        try {
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKey);
+            byte[] signatureBytes = hmacSha256.doFinal((requestBody + created + nonce + signatureInput).getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signature)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Assinatura inválida");
+            }
+
+            return ResponseEntity.ok("Mensagem autenticada com sucesso!");
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro ao verificar a assinatura");
+        }
+    }
+}
+Este exemplo assume que você está usando Spring Boot e define um endpoint POST em /webhook que espera os headers digest, signature e signature-input, além do corpo da requisição. Ele então realiza a verificação HMAC conforme discutido anteriormente. Certifique-se de substituir "your-secret-key" pela chave secreta real.
+
+User
+O @RequestBody String requestBody seria um objeto Status com id, name do tipo string e um campo Map que podera receber outros dados de tipos diferentes 
+ChatGPT
+Se o corpo da sua solicitação POST contém um objeto Status com um campo id, um campo name do tipo String e um campo data do tipo Map, você pode criar uma classe Status para representar esses dados. Aqui está como você pode modificar o código para lidar com isso:
+
+java
+Copy code
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+import java.util.Map;
+
+@RestController
+public class WebhookController {
+
+    private static final String SECRET = "your-secret-key";
+
+    @PostMapping("/webhook")
+    public ResponseEntity<String> handleWebhook(@RequestHeader("digest") String digest,
+                                                @RequestHeader("signature") String signature,
+                                                @RequestHeader("signature-input") String signatureInput,
+                                                @RequestBody Status requestBody) {
+        // Parse dos valores do header signature-input
+        String[] sigInputParts = signatureInput.split(";");
+        String created = "";
+        String nonce = "";
+        for (String part : sigInputParts) {
+            String[] keyValue = part.split("=");
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String value = keyValue[1].replace("\"", "").trim();
+                if (key.equals("created")) {
+                    created = value;
+                } else if (key.equals("nonce")) {
+                    nonce = value;
+                }
+            }
+        }
+
+        // Verificar se a Signature usa o algoritmo esperado
+        String alg = "";
+        String[] algParts = signatureInput.split(";");
+        for (String part : algParts) {
+            if (part.startsWith("alg=")) {
+                alg = part.substring(4).replace("\"", "").trim();
+                break;
+            }
+        }
+        if (!alg.equals("hmac-sha256")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Algoritmo de assinatura inválido");
+        }
+
+        // Gerar a signature esperada usando HMAC-SHA256
+        try {
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKey);
+            byte[] signatureBytes = hmacSha256.doFinal((requestBody.toString() + created + nonce + signatureInput).getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signature)) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Assinatura inválida");
+            }
+
+            return ResponseEntity.ok("Mensagem autenticada com sucesso!");
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro ao verificar a assinatura");
+        }
+    }
+}
+Esta é uma implementação básica. Você precisará ajustar de acordo com os requisitos específicos do seu aplicativo. Certifique-se de que a classe Status tenha os campos id, name e data conforme descrito.
+
+User
+Seria possivel interceptar essa chamada realizar a validação e depois caso o hash seja igual continuar a chamada para o controller ?
+ChatGPT
+Sim, é possível usar um interceptor para realizar a validação da assinatura HMAC antes de permitir que a chamada chegue ao controller. Aqui está um exemplo de como você pode implementar isso com um interceptor em Spring Boot:
+
+java
+Copy code
+import org.springframework.stereotype.Component;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.ModelAndView;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+@Component
+public class HMACValidationInterceptor implements HandlerInterceptor {
+
+    private static final String SECRET = "your-secret-key";
+
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
+        String digest = request.getHeader("digest");
+        String signature = request.getHeader("signature");
+        String signatureInput = request.getHeader("signature-input");
+
+        // Parse dos valores do header signature-input
+        String[] sigInputParts = signatureInput.split(";");
+        String created = "";
+        String nonce = "";
+        for (String part : sigInputParts) {
+            String[] keyValue = part.split("=");
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String value = keyValue[1].replace("\"", "").trim();
+                if (key.equals("created")) {
+                    created = value;
+                } else if (key.equals("nonce")) {
+                    nonce = value;
+                }
+            }
+        }
+
+        // Verificar se a Signature usa o algoritmo esperado
+        String alg = "";
+        String[] algParts = signatureInput.split(";");
+        for (String part : algParts) {
+            if (part.startsWith("alg=")) {
+                alg = part.substring(4).replace("\"", "").trim();
+                break;
+            }
+        }
+        if (!alg.equals("hmac-sha256")) {
+            response.sendError(HttpServletResponse.SC_BAD_REQUEST, "Algoritmo de assinatura inválido");
+            return false;
+        }
+
+        // Gerar a signature esperada usando HMAC-SHA256
+        try {
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKey);
+            byte[] signatureBytes = hmacSha256.doFinal((request.toString() + created + nonce + signatureInput).getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signature)) {
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Assinatura inválida");
+                return false;
+            }
+
+            // Se a assinatura for válida, permitir que a chamada continue para o controller
+            return true;
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+            response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, "Erro ao verificar a assinatura");
+            return false;
+        }
+    }
+
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+        // Este método é deixado em branco, mas pode ser implementado conforme necessário
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws Exception {
+        // Este método é deixado em branco, mas pode ser implementado conforme necessário
+    }
+}
+Em seguida, você precisará registrar o interceptor no seu aplicativo Spring Boot. Isso geralmente é feito no arquivo de configuração da aplicação:
+
+java
+Copy code
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class WebMvcConfig implements WebMvcConfigurer {
+
+    private final HMACValidationInterceptor hmacValidationInterceptor;
+
+    @Autowired
+    public WebMvcConfig(HMACValidationInterceptor hmacValidationInterceptor) {
+        this.hmacValidationInterceptor = hmacValidationInterceptor;
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(hmacValidationInterceptor).addPathPatterns("/webhook");
+    }
+}
+Neste exemplo, o interceptor HMACValidationInterceptor é registrado apenas para interceptar solicitações para o endpoint /webhook. Isso garantirá que a validação HMAC seja realizada antes que a solicitação chegue ao seu controller. Se a assinatura for inválida, o interceptor enviará uma resposta de erro correspondente e a solicitação não será encaminhada ao controller. Se a assinatura for válida, a solicitação continuará para o controller normalmente.
+
+User
+teria outra forma de interceptar e continuar posteriormente para o controller 
+ChatGPT
+Sim, há outra maneira de interceptar uma requisição e continuar posteriormente para o controller em Spring Boot, utilizando o conceito de filtros. Os filtros são componentes que permitem interceptar e manipular requisições e respostas HTTP antes e depois de serem processadas pelos controllers.
+
+Aqui está um exemplo de como você pode implementar um filtro para realizar a validação HMAC e permitir que a requisição continue para o controller se a assinatura for válida:
+
+java
+Copy code
+import org.springframework.stereotype.Component;
+import javax.servlet.*;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+@Component
+public class HMACValidationFilter implements Filter {
+
+    private static final String SECRET = "your-secret-key";
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        HttpServletResponse httpResponse = (HttpServletResponse) response;
+
+        String digest = httpRequest.getHeader("digest");
+        String signature = httpRequest.getHeader("signature");
+        String signatureInput = httpRequest.getHeader("signature-input");
+
+        // Parse dos valores do header signature-input
+        String[] sigInputParts = signatureInput.split(";");
+        String created = "";
+        String nonce = "";
+        for (String part : sigInputParts) {
+            String[] keyValue = part.split("=");
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String value = keyValue[1].replace("\"", "").trim();
+                if (key.equals("created")) {
+                    created = value;
+                } else if (key.equals("nonce")) {
+                    nonce = value;
+                }
+            }
+        }
+
+        // Verificar se a Signature usa o algoritmo esperado
+        String alg = "";
+        String[] algParts = signatureInput.split(";");
+        for (String part : algParts) {
+            if (part.startsWith("alg=")) {
+                alg = part.substring(4).replace("\"", "").trim();
+                break;
+            }
+        }
+        if (!alg.equals("hmac-sha256")) {
+            httpResponse.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return;
+        }
+
+        // Gerar a signature esperada usando HMAC-SHA256
+        try {
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKey);
+            byte[] signatureBytes = hmacSha256.doFinal((httpRequest.toString() + created + nonce + signatureInput).getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signature)) {
+                httpResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
+
+            // Se a assinatura for válida, permitir que a chamada continue para o controller
+            chain.doFilter(request, response);
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+            httpResponse.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        // Método init não utilizado neste exemplo
+    }
+
+    @Override
+    public void destroy() {
+        // Método destroy não utilizado neste exemplo
+    }
+}
+Para registrar este filtro, você pode usar a classe FilterRegistrationBean na sua configuração Spring Boot:
+
+java
+Copy code
+import org.springframework.boot.web.servlet.FilterRegistrationBean;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+@Configuration
+public class WebConfig {
+
+    @Bean
+    public FilterRegistrationBean<HMACValidationFilter> filterRegistrationBean() {
+        FilterRegistrationBean<HMACValidationFilter> registrationBean = new FilterRegistrationBean<>();
+        registrationBean.setFilter(new HMACValidationFilter());
+        registrationBean.addUrlPatterns("/webhook");
+        return registrationBean;
+    }
+}
+Neste exemplo, o filtro HMACValidationFilter é registrado para interceptar apenas as solicitações para o endpoint /webhook. Se a assinatura for válida, a requisição continua para o controller normalmente usando chain.doFilter(request, response). Se a assinatura for inválida, o filtro retorna um status HTTP correspondente sem continuar para o controller.
+
+User
+teria alguma outra forma ? 
+ChatGPT
+Uma terceira forma de interceptar uma chamada e posteriormente encaminhá-la para o controller em Spring Boot é usando aspectos. Aspectos permitem adicionar funcionalidades a métodos específicos ou pontos de entrada em sua aplicação, como métodos de controller.
+
+Você pode criar um aspecto para realizar a validação HMAC e, se a assinatura for válida, permitir que a execução continue normalmente para o método do controller. Aqui está um exemplo de como você pode fazer isso:
+
+java
+Copy code
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.aspectj.lang.annotation.Pointcut;
+import org.springframework.stereotype.Component;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+@Aspect
+@Component
+public class HMACValidationAspect {
+
+    private static final String SECRET = "your-secret-key";
+
+    @Pointcut("execution(* com.example.controller.YourController.*(..)) && args(digest, signature, signatureInput, requestBody)")
+    public void controllerMethods(String digest, String signature, String signatureInput, Object requestBody) {}
+
+    @Before("controllerMethods(digest, signature, signatureInput, requestBody)")
+    public void validateHMAC(String digest, String signature, String signatureInput, Object requestBody) {
+        // Parse dos valores do header signature-input
+        String[] sigInputParts = signatureInput.split(";");
+        String created = "";
+        String nonce = "";
+        for (String part : sigInputParts) {
+            String[] keyValue = part.split("=");
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String value = keyValue[1].replace("\"", "").trim();
+                if (key.equals("created")) {
+                    created = value;
+                } else if (key.equals("nonce")) {
+                    nonce = value;
+                }
+            }
+        }
+
+        // Verificar se a Signature usa o algoritmo esperado
+        String alg = "";
+        String[] algParts = signatureInput.split(";");
+        for (String part : algParts) {
+            if (part.startsWith("alg=")) {
+                alg = part.substring(4).replace("\"", "").trim();
+                break;
+            }
+        }
+        if (!alg.equals("hmac-sha256")) {
+            throw new IllegalArgumentException("Algoritmo de assinatura inválido");
+        }
+
+        // Gerar a signature esperada usando HMAC-SHA256
+        try {
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKey);
+            byte[] signatureBytes = hmacSha256.doFinal((requestBody.toString() + created + nonce + signatureInput).getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            if (!expectedSignature.equals(signature)) {
+                throw new IllegalArgumentException("Assinatura inválida");
+            }
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+            throw new IllegalStateException("Erro ao verificar a assinatura");
+        }
+    }
+}
+Neste exemplo, o aspecto HMACValidationAspect é configurado para interceptar todos os métodos no pacote do seu controller (ajuste o pacote conforme necessário) que aceitam os parâmetros digest, signature, signatureInput e requestBody. O método validateHMAC é executado antes da execução do método do controller, onde a validação HMAC é realizada. Se a assinatura não for válida, uma exceção é lançada, interrompendo a execução do método do controller. Se a assinatura for válida, a execução continua normalmente para o método do controller.
+
+Lembre-se de ajustar o pacote do controller e os parâmetros do método conforme a estrutura real do seu aplicativo.
+
+User
+e uma forma onde levariamos para uma classe separada está verificação sem o uso do intercepto caso for valida retorna valor true e poderiamos seguir com a chamada ao caso de uso UseCaseStatus e caso vir false retornamos um status 401 
+ChatGPT
+Sim, é possível criar uma classe separada para realizar a verificação HMAC sem o uso de interceptores. Você pode criar um serviço dedicado para isso, que pode ser invocado antes de chamar o caso de uso UseCaseStatus. Aqui está um exemplo de como você pode fazer isso:
+
+java
+Copy code
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+public class HMACValidationService {
+
+    private static final String SECRET = "your-secret-key";
+
+    public static boolean validateHMAC(String digest, String signature, String signatureInput, Object requestBody) {
+        // Parse dos valores do header signature-input
+        String[] sigInputParts = signatureInput.split(";");
+        String created = "";
+        String nonce = "";
+        for (String part : sigInputParts) {
+            String[] keyValue = part.split("=");
+            if (keyValue.length == 2) {
+                String key = keyValue[0].trim();
+                String value = keyValue[1].replace("\"", "").trim();
+                if (key.equals("created")) {
+                    created = value;
+                } else if (key.equals("nonce")) {
+                    nonce = value;
+                }
+            }
+        }
+
+        // Verificar se a Signature usa o algoritmo esperado
+        String alg = "";
+        String[] algParts = signatureInput.split(";");
+        for (String part : algParts) {
+            if (part.startsWith("alg=")) {
+                alg = part.substring(4).replace("\"", "").trim();
+                break;
+            }
+        }
+        if (!alg.equals("hmac-sha256")) {
+            return false;
+        }
+
+        // Gerar a signature esperada usando HMAC-SHA256
+        try {
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKey);
+            byte[] signatureBytes = hmacSha256.doFinal((requestBody.toString() + created + nonce + signatureInput).getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            // Comparar as signatures para verificar a autenticidade da mensagem
+            return expectedSignature.equals(signature);
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+}
+Com esta classe de serviço criada, você pode invocar o método validateHMAC antes de chamar o caso de uso UseCaseStatus. Aqui está um exemplo de como você pode fazer isso em seu controlador:
+
+java
+Copy code
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class WebhookController {
+
+    @PostMapping("/webhook")
+    public ResponseEntity<String> handleWebhook(@RequestHeader("digest") String digest,
+                                                @RequestHeader("signature") String signature,
+                                                @RequestHeader("signature-input") String signatureInput,
+                                                @RequestBody Object requestBody) {
+
+        // Realizar a validação HMAC
+        boolean isValidHMAC = HMACValidationService.validateHMAC(digest, signature, signatureInput, requestBody);
+
+        // Se a assinatura for inválida, retornar status 401
+        if (!isValidHMAC) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Assinatura inválida");
+        }
+
+        // Se a assinatura for válida, continuar com o caso de uso UseCaseStatus
+        UseCaseStatusResult result = UseCaseStatus.execute(requestBody); // Exemplo de chamada ao caso de uso UseCaseStatus
+
+        // Retornar resultado do caso de uso
+        if (result.isSuccess()) {
+            return ResponseEntity.ok("Mensagem autenticada e processada com sucesso!");
+        } else {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Erro ao processar mensagem");
+        }
+    }
+}
+Neste exemplo, o método handleWebhook do controlador invoca o método validateHMAC da classe HMACValidationService antes de chamar o caso de uso UseCaseStatus. Se a assinatura for válida, o controlador continua com a execução normalmente, caso contrário, retorna um status 401.
+
+User
+O ResponseEntity<String> pode ser void e mesmo assim retornar os status ? 
+ChatGPT
+Sim, você pode definir o tipo de retorno do método como void e ainda assim retornar os status HTTP usando a classe HttpServletResponse. Aqui está como você pode fazer isso:
+
+java
+Copy code
+import org.springframework.http.HttpStatus;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RestController;
+import javax.servlet.http.HttpServletResponse;
+
+@RestController
+public class WebhookController {
+
+    @PostMapping("/webhook")
+    public void handleWebhook(@RequestHeader("digest") String digest,
+                              @RequestHeader("signature") String signature,
+                              @RequestHeader("signature-input") String signatureInput,
+                              @RequestBody Object requestBody,
+                              HttpServletResponse httpResponse) {
+
+        // Realizar a validação HMAC
+        boolean isValidHMAC = HMACValidationService.validateHMAC(digest, signature, signatureInput, requestBody);
+
+        // Se a assinatura for inválida, retornar status 401
+        if (!isValidHMAC) {
+            httpResponse.setStatus(HttpStatus.UNAUTHORIZED.value());
+            return;
+        }
+
+        // Se a assinatura for válida, continuar com o caso de uso UseCaseStatus
+        UseCaseStatusResult result = UseCaseStatus.execute(requestBody); // Exemplo de chamada ao caso de uso UseCaseStatus
+
+        // Retornar resultado do caso de uso
+        if (result.isSuccess()) {
+            httpResponse.setStatus(HttpStatus.OK.value());
+        } else {
+            httpResponse.setStatus(HttpStatus.INTERNAL_SERVER_ERROR.value());
+        }
+    }
+}
+Neste exemplo, o método handleWebhook recebe um parâmetro adicional HttpServletResponse que permite definir o status da resposta HTTP. Se a assinatura não for válida, o status é definido como 401 (UNAUTHORIZED) e o método retorna. Caso contrário, o método continua com a execução normal e define o status da resposta com base no resultado do caso de uso UseCaseStatus.
