@@ -767,3 +767,122 @@ public class HmacValidator {
 
 
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
+
+@Component
+public class RequestFilter extends OncePerRequestFilter {
+
+    private final HmacValidator hmacValidator;
+
+    @Autowired
+    public RequestFilter(HmacValidator hmacValidator) {
+        this.hmacValidator = hmacValidator;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest httpServletRequest, HttpServletResponse httpServletResponse, FilterChain filterChain) throws ServletException, IOException {
+        putHeadersInMDC(httpServletRequest);
+
+        // Verifica se a requisição é para a rota específica que requer validação HMAC
+        if ("/sua-rota-especifica".equals(httpServletRequest.getRequestURI())) {
+            // Recupera o HMAC recebido na requisição
+            String receivedHmac = httpServletRequest.getHeader("X-Hmac-Digest");
+
+            // Valida o HMAC usando o HmacValidator
+            if (!hmacValidator.validateHmac(httpServletRequest, receivedHmac)) {
+                // Se a validação falhar, retorna um código de status HTTP 401
+                httpServletResponse.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                return;
+            }
+        }
+
+        // Continua com o processamento da requisição
+        filterChain.doFilter(httpServletRequest, httpServletResponse);
+
+        MDC.clear();
+    }
+
+    private void putHeadersInMDC(HttpServletRequest httpServletRequest) {
+        MDC.put(LogKey.HTTP_REQUEST, String.format("%s %s", httpServletRequest.getMethod(), httpServletRequest.getRequestURI()));
+        Optional.ofNullable(httpServletRequest.getHeaderNames()).ifPresent(
+                ignored -> HEADERS_FOR_LOGGING.forEach(header -> MDC.put(header, httpServletRequest.getHeader(header))));
+    }
+}
+
+
+import org.springframework.stereotype.Component;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import javax.servlet.http.HttpServletRequest;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+
+@Component
+public class HmacValidator {
+
+    // Chave secreta para o HMAC (substitua pela sua chave real)
+    private static final String SECRET_KEY = "suaChaveSecreta";
+
+    // Algoritmo de hash para o HMAC
+    private static final String HMAC_ALGORITHM = "HmacSHA256";
+
+    // Método para validar o HMAC
+    public boolean validateHmac(HttpServletRequest request, String receivedHmac) {
+        try {
+            // Recupera o corpo da requisição
+            String requestBody = getRequestBody(request);
+
+            // Constrói a mensagem a ser usada para calcular o HMAC
+            String message = request.getMethod() + request.getRequestURI() + requestBody;
+
+            // Calcula o HMAC
+            String calculatedHmac = calculateHmac(message);
+
+            // Verifica se os HMACs são iguais
+            if (!receivedHmac.equals(calculatedHmac)) {
+                return false;
+            }
+        } catch (IOException | NoSuchAlgorithmException | InvalidKeyException e) {
+            // Lidar com exceções
+            e.printStackTrace();
+            return false;
+        }
+        return true;
+    }
+
+    // Método para calcular o HMAC de uma mensagem
+    private String calculateHmac(String message) throws NoSuchAlgorithmException, InvalidKeyException {
+        Mac mac = Mac.getInstance(HMAC_ALGORITHM);
+        SecretKeySpec secretKeySpec = new SecretKeySpec(SECRET_KEY.getBytes(StandardCharsets.UTF_8), HMAC_ALGORITHM);
+        mac.init(secretKeySpec);
+        byte[] hmacBytes = mac.doFinal(message.getBytes(StandardCharsets.UTF_8));
+        return Base64.getEncoder().encodeToString(hmacBytes);
+    }
+
+    // Método para obter o corpo da requisição como uma string
+    private String getRequestBody(HttpServletRequest request) throws IOException {
+        StringBuilder requestBodyBuilder = new StringBuilder();
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(request.getInputStream()))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                requestBodyBuilder.append(line);
+            }
+        }
+        return requestBodyBuilder.toString();
+    }
+}
+
+
+
