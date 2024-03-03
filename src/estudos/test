@@ -715,3 +715,57 @@ public class WebhookController {
     }
 }
 Neste exemplo, o método handleWebhook recebe um parâmetro adicional HttpServletResponse que permite definir o status da resposta HTTP. Se a assinatura não for válida, o status é definido como 401 (UNAUTHORIZED) e o método retorna. Caso contrário, o método continua com a execução normal e define o status da resposta com base no resultado do caso de uso UseCaseStatus.
+
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+import java.nio.charset.StandardCharsets;
+import java.security.InvalidKeyException;
+import java.security.NoSuchAlgorithmException;
+import java.util.Base64;
+import java.util.Arrays;
+
+public class HMACValidationService {
+
+    private static final String SECRET = "your-secret-key";
+
+    public static boolean validateHMAC(String digest, String signature, String signatureInput, Object requestBody) {
+        String created = Arrays.stream(signatureInput.split(";"))
+                .map(String::trim)
+                .filter(part -> part.startsWith("created="))
+                .map(part -> part.split("=")[1].replace("\"", ""))
+                .findFirst()
+                .orElse("");
+
+        String nonce = Arrays.stream(signatureInput.split(";"))
+                .map(String::trim)
+                .filter(part -> part.startsWith("nonce="))
+                .map(part -> part.split("=")[1].replace("\"", ""))
+                .findFirst()
+                .orElse("");
+
+        String alg = Arrays.stream(signatureInput.split(";"))
+                .map(String::trim)
+                .filter(part -> part.startsWith("alg="))
+                .map(part -> part.split("=")[1].replace("\"", ""))
+                .findFirst()
+                .orElse("");
+
+        if (!alg.equals("hmac-sha256")) {
+            return false;
+        }
+
+        try {
+            Mac hmacSha256 = Mac.getInstance("HmacSHA256");
+            SecretKeySpec secretKey = new SecretKeySpec(SECRET.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+            hmacSha256.init(secretKey);
+            byte[] signatureBytes = hmacSha256.doFinal((requestBody.toString() + created + nonce + signatureInput).getBytes(StandardCharsets.UTF_8));
+            String expectedSignature = Base64.getEncoder().encodeToString(signatureBytes);
+
+            return expectedSignature.equals(signature);
+        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
+}
