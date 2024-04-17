@@ -123,3 +123,91 @@ Espero que esta descrição detalhada tenha sido útil!
 
 ChatGPT
 Esta é uma descrição detalhada dos endpoints com duas opções de resolução, onde a primeira envolve a orquestração via BFF com 4 endpoints distintos e a segunda é um único endpoint com validações adicionais. A primeira opção oferece maior granularidade e flexibilidade, enquanto a segunda é mais concisa, reunindo as funcionalidades em um único endpoint. A escolha entre as opções depende das necessidades do projeto, considerando fatores como simplicidade, flexibilidade e escalabilidade.
+
+
+
+
+
+## Descrição Detalhada dos Endpoints com Opções de Resolução
+
+**Objetivo:** Fornecer uma descrição detalhada dos endpoints e opções de resolução para o processo de onboarding de usuários, incluindo orquestração via BFF.
+
+**Fluxo do Processo:**
+
+1. **Início:** O processo se inicia com a requisição do usuário.
+2. **Elegibilidade:** A primeira etapa verifica se o usuário é elegível para o onboarding.
+3. **Asset:** Se elegível, o próximo passo é salvar ou atualizar o asset do usuário com dados padronizados.
+4. **Decisão de Template:** Com base no status de upgrade da conta do usuário, a decisão de qual template (full ou complement) será utilizada é tomada.
+5. **Aceite da Proposta:** A etapa final consiste no aceite da proposta pelo usuário, salvando parte do kit probatório.
+
+**Opção 1: Separação de Responsabilidades (4 Endpoints)**
+
+**1. Endpoint de Elegibilidade:**
+
+* **Função:** Verifica a elegibilidade do usuário para o onboarding.
+* **Retorno:**
+    * `true` se elegível.
+    * `false` se não elegível.
+* **Observação:** Este endpoint é crucial para iniciar o processo, filtrando usuários que não atendem aos critérios.
+
+**2. Endpoint de Asset:**
+
+* **Função:** Salva ou atualiza o asset do usuário com dados padronizados.
+* **Dados de Entrada:**
+    * Informações do usuário coletadas durante o processo de onboarding.
+* **Retorno:**
+    * Confirmação de sucesso ou erro na operação.
+* **Observação:** Este endpoint garante a consistência e integridade dos dados do usuário.
+
+**3. Endpoint de Decisão de Template:**
+
+* **Função:** Verifica o status de upgrade da conta do usuário e define qual template (full ou complement) será utilizado.
+* **Dados de Entrada:**
+    * ID do usuário.
+* **Retorno:**
+    * `full` se upgrade de conta for `true`.
+    * `complement` se upgrade de conta for `false`.
+* **Observação:** Este endpoint garante a personalização da experiência de onboarding com base no perfil do usuário.
+
+**4. Endpoint de Aceite da Proposta:**
+
+* **Função:** Permite que o usuário aceite a proposta e salva parte do kit probatório.
+* **Dados de Entrada:**
+    * ID do usuário.
+    * Dados do kit probatório preenchidos pelo usuário.
+* **Retorno:**
+    * Confirmação de sucesso ou erro na operação.
+* **Observação:** Este endpoint finaliza o processo de onboarding e registra o aceite do usuário.
+
+**Opção 2: Combinação de Funcionalidades (2 Endpoints)**
+
+**1. Endpoint Unificado:**
+
+* **Função:**
+    * Verifica a elegibilidade do usuário.
+    * Salva ou atualiza o asset do usuário com dados padronizados.
+    * Toma a decisão de qual template (full ou complement) será utilizado (full para upgrade de conta `true`).
+    * Permite o aceite da proposta e salva parte do kit probatório.
+* **Dados de Entrada:**
+    * Informações do usuário coletadas durante o processo de onboarding.
+* **Retorno:**
+    * Confirmação de sucesso ou erro em cada etapa do processo.
+* **Observação:** Este endpoint combina as funcionalidades em um único ponto, simplificando a requisição do cliente.
+
+**Benefícios da Separação de Responsabilidades (Opção 1):**
+
+* **Maior granularidade de controle:** Permite orquestrar o processo de forma mais precisa, definindo endpoints específicos para cada etapa.
+* **Melhoria na testabilidade:** Facilita o teste individual de cada endpoint, isolando potenciais falhas.
+* **Reutilização facilitada:** Os endpoints podem ser reutilizados em outros contextos, promovendo modularidade.
+
+**Benefícios da Combinação de Funcionalidades (Opção 2):**
+
+* **Simplificação da requisição:** Reduz o número de requisições do cliente, otimizando o tempo de resposta.
+* **Melhor experiência do usuário:** Apresenta um fluxo mais intuitivo e coeso para o usuário.
+* **Redução da complexidade:** Diminui a necessidade de orquestração complexa, facilitando a implementação.
+
+**Considerações Finais:**
+
+A escolha entre as opções 1 e 2 depende das necessidades específicas do projeto e da preferência da equipe de desenvolvimento. A opção 1 oferece maior controle e testabilidade, enquanto a opção 2 proporciona simplicidade e experiência otimizada para o usuário. A avaliação cuidadosa dos requisitos e das prioridades do projeto é fundamental para tomar a decisão mais adequada.
+
+**Observa
